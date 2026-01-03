@@ -1,94 +1,60 @@
-#!/usr/bin/env python
-import sys
-import warnings
+from dotenv import load_dotenv
+from crewai import Crew
+from tasks import MeetingPrepTasks
+from agents import MeetingPrepAgents
 
-from datetime import datetime
-
-from crew_project.crew import CrewProject
-
-warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
-
-# This main file is intended to be a way for you to run your
-# crew locally, so refrain from adding unnecessary logic into this file.
-# Replace with inputs you want to test with, it will automatically
-# interpolate any tasks and agents information
-
-def run():
+def run_meeting_prep(meeting_participants: str, meeting_context: str, meeting_objective: str):
     """
-    Run the crew.
+    Run the meeting prep crew and return the result (string or object returned by crew.kickoff()).
     """
-    inputs = {
-        'topic': 'AI LLMs',
-        'current_year': str(datetime.now().year)
-    }
+    tasks = MeetingPrepTasks()
+    agents = MeetingPrepAgents()
+    
+    # create agents
+    research_agent = agents.research_agent()
+    industry_analysis_agent = agents.industry_analysis_agent()
+    meeting_strategy_agent = agents.meeting_strategy_agent()
+    summary_and_briefing_agent = agents.summary_and_briefing_agent()
+    
+    # create tasks
+    research_task = tasks.research_task(research_agent, meeting_participants, meeting_context)
+    industry_analysis_task = tasks.industry_analysis_task(industry_analysis_agent, meeting_participants, meeting_context)
+    meeting_strategy_task = tasks.meeting_strategy_task(meeting_strategy_agent, meeting_context, meeting_objective)
+    summary_and_briefing_task = tasks.summary_and_briefing_task(summary_and_briefing_agent, meeting_context, meeting_objective)
+    
+    meeting_strategy_task.context = [research_task, industry_analysis_task]
+    summary_and_briefing_task.context = [research_task, industry_analysis_task, meeting_strategy_task]
+    
+    crew = Crew(
+      agents=[
+        research_agent,
+        industry_analysis_agent,
+        meeting_strategy_agent,
+        summary_and_briefing_agent
+      ],
+      tasks=[
+        research_task,
+        industry_analysis_task,
+        meeting_strategy_task,
+        summary_and_briefing_task
+      ]
+    )
+    
+    result = crew.kickoff()
+    return result
 
-    try:
-        CrewProject().crew().kickoff(inputs=inputs)
-    except Exception as e:
-        raise Exception(f"An error occurred while running the crew: {e}")
+def main():
+    load_dotenv()
+    
+    print("## Welcome to the Meeting Prep Crew")
+    print('-------------------------------')
+    meeting_participants = input("What are the emails for the participants (other than you) in the meeting?\n")
+    meeting_context = input("What is the context of the meeting?\n")
+    meeting_objective = input("What is your objective for this meeting?\n")
 
-
-def train():
-    """
-    Train the crew for a given number of iterations.
-    """
-    inputs = {
-        "topic": "AI LLMs",
-        'current_year': str(datetime.now().year)
-    }
-    try:
-        CrewProject().crew().train(n_iterations=int(sys.argv[1]), filename=sys.argv[2], inputs=inputs)
-
-    except Exception as e:
-        raise Exception(f"An error occurred while training the crew: {e}")
-
-def replay():
-    """
-    Replay the crew execution from a specific task.
-    """
-    try:
-        CrewProject().crew().replay(task_id=sys.argv[1])
-
-    except Exception as e:
-        raise Exception(f"An error occurred while replaying the crew: {e}")
-
-def test():
-    """
-    Test the crew execution and returns the results.
-    """
-    inputs = {
-        "topic": "AI LLMs",
-        "current_year": str(datetime.now().year)
-    }
-
-    try:
-        CrewProject().crew().test(n_iterations=int(sys.argv[1]), eval_llm=sys.argv[2], inputs=inputs)
-
-    except Exception as e:
-        raise Exception(f"An error occurred while testing the crew: {e}")
-
-def run_with_trigger():
-    """
-    Run the crew with trigger payload.
-    """
-    import json
-
-    if len(sys.argv) < 2:
-        raise Exception("No trigger payload provided. Please provide JSON payload as argument.")
-
-    try:
-        trigger_payload = json.loads(sys.argv[1])
-    except json.JSONDecodeError:
-        raise Exception("Invalid JSON payload provided as argument")
-
-    inputs = {
-        "crewai_trigger_payload": trigger_payload,
-        "topic": "",
-        "current_year": ""
-    }
-
-    try:
-        result = CrewProject().crew().kickoff(inputs=inputs)
-        return result
-    except Exception as e:
-        raise Exception(f"An error occurred while running the crew with trigger: {e}")
+    result = run_meeting_prep(meeting_participants, meeting_context, meeting_objective)
+    
+    print(result)
+    
+if __name__ == "__main__":
+    main()
